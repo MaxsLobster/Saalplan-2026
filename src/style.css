@@ -340,40 +340,6 @@ g.stand:active .stand-rect { opacity: 0.8; }
   font-size: 15px;
 }
 
-/* Foto-Bereich im Modal */
-.photo-area {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.photo-preview {
-  max-width: 100%;
-  max-height: 240px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  object-fit: cover;
-  background: #0d0d0d;
-}
-.photo-btn {
-  padding: 10px 14px;
-  background: #2a2a2a;
-  border: 1px dashed #555;
-  border-radius: 8px;
-  color: #f5b400;
-  font-size: 14px;
-  font-weight: 500;
-  width: 100%;
-  text-align: center;
-}
-.photo-btn:active { background: #333; }
-.photo-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.photo-status {
-  font-size: 12px;
-  color: #888;
-  min-height: 16px;
-}
-.photo-status.error { color: #ff6b6b; }
-
 .modal-buttons {
   display: flex;
   gap: 10px;
