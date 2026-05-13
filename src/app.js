@@ -657,6 +657,10 @@ const panZoom = (() => {
     let touchPanLastX = 0, touchPanLastY = 0;
     let touchDownX = 0, touchDownY = 0;
     let pinching = false;
+    // Erst ab > 8px Fingerbewegung als Pan zählen — sonst werden
+    // Tap-Klicks unterdrückt (touchmove preventDefault blockiert click).
+    let panActiveTouch = false;
+    const PAN_THRESHOLD = 8;
 
     c.addEventListener("touchstart", (e) => {
       if (e.touches.length === 1) {
@@ -665,6 +669,7 @@ const panZoom = (() => {
         touchDownX = touchPanLastX;
         touchDownY = touchPanLastY;
         pinching = false;
+        panActiveTouch = false;
       } else if (e.touches.length === 2) {
         pinching = true;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -680,6 +685,13 @@ const panZoom = (() => {
 
     c.addEventListener("touchmove", (e) => {
       if (e.touches.length === 1 && !pinching) {
+        const totalDx = e.touches[0].clientX - touchDownX;
+        const totalDy = e.touches[0].clientY - touchDownY;
+        // Unter Schwellwert: noch als möglicher Tap behandeln, nicht pannen
+        if (!panActiveTouch && Math.hypot(totalDx, totalDy) < PAN_THRESHOLD) {
+          return;
+        }
+        panActiveTouch = true;
         const dx = e.touches[0].clientX - touchPanLastX;
         const dy = e.touches[0].clientY - touchPanLastY;
         tx += dx;
@@ -707,6 +719,7 @@ const panZoom = (() => {
 
     c.addEventListener("touchend", (e) => {
       if (e.touches.length < 2) pinching = false;
+      if (e.touches.length === 0) panActiveTouch = false;
     });
 
     window.addEventListener("resize", fit);
