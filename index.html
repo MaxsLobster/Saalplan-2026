@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>Saalplan — Munich Watch Fair</title>
+  <link rel="stylesheet" href="src/style.css">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231a1a1a'/%3E%3Ctext x='50' y='65' font-family='sans-serif' font-size='60' fill='%23f5b400' text-anchor='middle' font-weight='bold'%3EMW%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+  <!-- Token-Login -->
+  <div id="token-screen" class="hidden">
+    <div class="token-box">
+      <h1>Saalplan</h1>
+      <p class="subtitle">Munich Watch Fair</p>
+      <p>Bitte deinen Airtable Personal Access Token eingeben.</p>
+      <input type="password" id="token-input" placeholder="patXXXXXXXXXX…" autocomplete="off" spellcheck="false">
+      <button id="token-save" class="primary">Anmelden</button>
+      <p id="token-error" class="error"></p>
+      <details>
+        <summary>Wie bekomme ich einen Token?</summary>
+        <ol>
+          <li>Geh zu <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a></li>
+          <li>Klick „Create new token"</li>
+          <li>Name: z. B. „Saalplan-App"</li>
+          <li>Scopes: <code>data.records:read</code> + <code>data.records:write</code></li>
+          <li>Access: „Munich Watch Fair - Standplan" auswählen</li>
+          <li>Token kopieren und hier einfügen</li>
+        </ol>
+        <p><strong>Hinweis:</strong> Der Token wird nur lokal in deinem Browser gespeichert, nie ans Internet geschickt — außer an Airtable selbst.</p>
+      </details>
+    </div>
+  </div>
+
+  <!-- Haupt-App -->
+  <div id="app" class="hidden">
+    <header>
+      <div class="header-top">
+        <input type="search" id="search" placeholder="🔎 Stand-Nr. oder Aussteller …" autocomplete="off" spellcheck="false">
+        <button id="logout-btn" class="icon-btn" title="Abmelden">⎋</button>
+      </div>
+      <div class="header-bottom">
+        <div id="stats">
+          <span id="stats-total" class="stat-total">– / –</span>
+          <span id="stats-besetzt" class="stat besetzt">– besetzt</span>
+          <span id="stats-reserviert" class="stat reserviert">– reserviert</span>
+          <span id="stats-frei" class="stat frei">– frei</span>
+        </div>
+        <button id="sync-status" class="sync-btn" title="Sync-Status (klicken zum Aktualisieren)">
+          <span id="sync-indicator" data-status="syncing">●</span>
+          <span id="sync-text">Synchronisiere …</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="plan-container">
+      <svg id="plan" preserveAspectRatio="xMidYMid meet"></svg>
+    </main>
+  </div>
+
+  <!-- Detail-Modal -->
+  <div id="modal" class="hidden">
+    <div class="modal-content" role="dialog" aria-labelledby="modal-title">
+      <h2 id="modal-title">Stand <span id="modal-stand-nr">–</span></h2>
+      <p id="modal-error" class="error"></p>
+
+      <label class="field">
+        <span class="field-label">Status</span>
+        <select id="modal-status">
+          <option value="frei">frei</option>
+          <option value="besetzt">besetzt</option>
+          <option value="reserviert">reserviert</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Aussteller</span>
+        <input type="text" id="modal-aussteller" list="aussteller-list" placeholder="(leer = kein Aussteller)" autocomplete="off">
+        <datalist id="aussteller-list"></datalist>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Notizen</span>
+        <textarea id="modal-notes" rows="3" placeholder="Optional…"></textarea>
+      </label>
+
+      <label class="field checkbox-field">
+        <input type="checkbox" id="modal-bezahlt">
+        <span>Bezahlt</span>
+      </label>
+
+      <div class="modal-buttons">
+        <button id="modal-cancel">Abbrechen</button>
+        <button id="modal-save" class="primary">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
