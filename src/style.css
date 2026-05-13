@@ -334,20 +334,11 @@ g.stand:active .stand-rect { opacity: 0.8; }
 }
 .checkbox-field input { width: 20px; height: 20px; accent-color: #f5b400; }
 
-/* Status-Pill (automatisch berechnet) */
-.status-pill {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 999px;
+/* Status-Dropdown */
+.status-select {
   font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  width: fit-content;
+  font-size: 15px;
 }
-.status-pill[data-status="frei"]       { background: #2e7d32; color: #fff; }
-.status-pill[data-status="reserviert"] { background: #b08400; color: #fff; }
-.status-pill[data-status="besetzt"]    { background: #c0392b; color: #fff; }
 
 /* Foto-Bereich im Modal */
 .photo-area {

@@ -38,7 +38,8 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 // === Status-Automatik ===
-// Status wird automatisch aus (Aussteller, Bezahlt) abgeleitet:
+// Status-VORSCHLAG aus (Aussteller, Bezahlt) — kann im Modal-Dropdown
+// manuell überschrieben werden:
 //   kein Aussteller          → frei
 //   Aussteller + bezahlt     → besetzt
 //   Aussteller + nicht bezahlt → reserviert
@@ -46,6 +47,10 @@ function computeStatus(hasAussteller, bezahlt) {
   if (!hasAussteller) return "frei";
   return bezahlt ? "besetzt" : "reserviert";
 }
+
+// Markiert, ob der User den Status-Dropdown im aktuellen Modal manuell
+// geändert hat — dann werden keine Auto-Vorschläge mehr überschrieben.
+let modalStatusManuallyChanged = false;
 
 // === Token-Handling ===
 function loadToken() {
@@ -338,7 +343,17 @@ function openModal(standNr) {
   $("modal-bezahlt").checked = !!info.bezahlt;
   $("modal-error").textContent = "";
 
-  updateStatusPill();
+  // Status-Dropdown initial setzen.
+  // Wenn Airtable-Status inkonsistent zum Aussteller (z.B. "frei" trotz Name)
+  // → automatisch korrigieren, User muss nur noch Speichern klicken.
+  modalStatusManuallyChanged = false;
+  const hasAussteller = !!firstId;
+  const autoStatus = computeStatus(hasAussteller, !!info.bezahlt);
+  const airtableStatus = info.status || "frei";
+  const inconsistent =
+    (hasAussteller && airtableStatus === "frei") ||
+    (!hasAussteller && airtableStatus !== "frei");
+  $("modal-status").value = inconsistent ? autoStatus : airtableStatus;
 
   // Foto-Vorschau
   const preview = $("modal-photo-preview");
@@ -366,13 +381,14 @@ function openModal(standNr) {
   $("modal").classList.remove("hidden");
 }
 
-function updateStatusPill() {
+// Wird bei Aussteller- oder Bezahlt-Änderung aufgerufen:
+// schlägt einen neuen Status vor, aber nur wenn der User den Dropdown
+// NICHT bereits manuell überschrieben hat.
+function suggestStatusFromInputs() {
+  if (modalStatusManuallyChanged) return;
   const name = $("modal-aussteller").value.trim();
   const bezahlt = $("modal-bezahlt").checked;
-  const status = computeStatus(!!name, bezahlt);
-  const pill = $("modal-status-pill");
-  pill.textContent = status;
-  pill.dataset.status = status;
+  $("modal-status").value = computeStatus(!!name, bezahlt);
 }
 
 function closeModal() {
@@ -390,7 +406,8 @@ async function saveModal() {
   const notes = $("modal-notes").value;
   const bezahlt = $("modal-bezahlt").checked;
   const ausstellerName = $("modal-aussteller").value.trim();
-  const status = computeStatus(!!ausstellerName, bezahlt);
+  // Status: nimm den Wert aus dem Dropdown (User-Override möglich).
+  const status = $("modal-status").value;
 
   // Aussteller auflösen — wenn name leer → keine Verknüpfung, sonst suchen/anlegen
   let ausstellerIds = [];
@@ -741,9 +758,13 @@ async function startApp() {
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
   });
-  // Status-Pill live aktualisieren wenn Aussteller oder Bezahlt geändert wird
-  $("modal-aussteller").addEventListener("input", updateStatusPill);
-  $("modal-bezahlt").addEventListener("change", updateStatusPill);
+  // Status-Vorschlag aktualisieren wenn Aussteller oder Bezahlt sich ändert
+  $("modal-aussteller").addEventListener("input", suggestStatusFromInputs);
+  $("modal-bezahlt").addEventListener("change", suggestStatusFromInputs);
+  // Manuelles Ändern des Status: respektieren, keine Auto-Überschreibung mehr
+  $("modal-status").addEventListener("change", () => {
+    modalStatusManuallyChanged = true;
+  });
   // Foto: Button öffnet File-Picker (Kamera auf iPad/iPhone)
   $("modal-photo-btn").addEventListener("click", () => $("modal-photo-input").click());
   $("modal-photo-input").addEventListener("change", handlePhotoChange);

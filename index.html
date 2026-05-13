@@ -68,10 +68,14 @@
       <h2 id="modal-title">Stand <span id="modal-stand-nr">–</span></h2>
       <p id="modal-error" class="error"></p>
 
-      <div class="field">
-        <span class="field-label">Status (automatisch)</span>
-        <span class="status-pill" id="modal-status-pill" data-status="frei">frei</span>
-      </div>
+      <label class="field">
+        <span class="field-label">Status</span>
+        <select id="modal-status" class="status-select">
+          <option value="frei">🟢 frei</option>
+          <option value="reserviert">🟡 reserviert</option>
+          <option value="besetzt">🔴 besetzt</option>
+        </select>
+      </label>
 
       <label class="field">
         <span class="field-label">Aussteller</span>
@@ -81,7 +85,7 @@
 
       <label class="field checkbox-field">
         <input type="checkbox" id="modal-bezahlt">
-        <span>Bezahlt (= besetzt)</span>
+        <span>Bezahlt</span>
       </label>
 
       <label class="field">
