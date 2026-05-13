@@ -4,10 +4,12 @@ import {
   STANDPLAN_TABLE,
   AUSSTELLER_TABLE,
   FIELDS,
+  FOTO_FIELD_NAME,
   listAllRecords,
   updateStandplanRecord,
   createAussteller,
   validateToken,
+  uploadStandFoto,
 } from "./airtable.js";
 
 // === Konstanten ===
@@ -34,6 +36,16 @@ const state = {
 
 // === DOM-Referenzen ===
 const $ = (id) => document.getElementById(id);
+
+// === Status-Automatik ===
+// Status wird automatisch aus (Aussteller, Bezahlt) abgeleitet:
+//   kein Aussteller          → frei
+//   Aussteller + bezahlt     → besetzt
+//   Aussteller + nicht bezahlt → reserviert
+function computeStatus(hasAussteller, bezahlt) {
+  if (!hasAussteller) return "frei";
+  return bezahlt ? "besetzt" : "reserviert";
+}
 
 // === Token-Handling ===
 function loadToken() {
@@ -232,12 +244,24 @@ async function syncFromAirtable() {
     for (const r of standRecords) {
       const standNr = r.fields[FIELDS.standnummer];
       if (standNr == null) continue;
+
+      // Foto-Feld: returnFieldsByFieldId verwendet Field-IDs als keys,
+      // daher das Foto-Feld anhand der Attachment-Struktur identifizieren.
+      let foto = null;
+      for (const value of Object.values(r.fields)) {
+        if (Array.isArray(value) && value[0]?.url && value[0]?.type?.startsWith("image/")) {
+          foto = value[0].url;
+          break;
+        }
+      }
+
       state.standsByNr.set(String(standNr), {
         recordId: r.id,
         status: r.fields[FIELDS.status] || "frei",
         ausstellerIds: r.fields[FIELDS.aussteller] || [],
         notes: r.fields[FIELDS.notes] || "",
         bezahlt: !!r.fields[FIELDS.bezahlt],
+        foto,
       });
     }
 
@@ -302,10 +326,10 @@ function openModal(standNr) {
     ausstellerIds: [],
     notes: "",
     bezahlt: false,
+    foto: null,
   };
 
   $("modal-stand-nr").textContent = standNr;
-  $("modal-status").value = info.status;
   const firstId = info.ausstellerIds?.[0];
   $("modal-aussteller").value = firstId
     ? state.ausstellerById.get(firstId)?.firmenname || ""
@@ -314,15 +338,41 @@ function openModal(standNr) {
   $("modal-bezahlt").checked = !!info.bezahlt;
   $("modal-error").textContent = "";
 
+  updateStatusPill();
+
+  // Foto-Vorschau
+  const preview = $("modal-photo-preview");
+  if (info.foto) {
+    preview.src = info.foto;
+    preview.classList.remove("hidden");
+  } else {
+    preview.removeAttribute("src");
+    preview.classList.add("hidden");
+  }
+  $("modal-photo-status").textContent = "";
+  $("modal-photo-status").classList.remove("error");
+  $("modal-photo-input").value = "";
+
   if (!info.recordId) {
     $("modal-error").textContent =
       "Hinweis: Dieser Stand ist noch nicht in Airtable angelegt. Bitte zuerst in Airtable hinzufügen.";
     $("modal-save").disabled = true;
+    $("modal-photo-btn").disabled = true;
   } else {
     $("modal-save").disabled = false;
+    $("modal-photo-btn").disabled = false;
   }
 
   $("modal").classList.remove("hidden");
+}
+
+function updateStatusPill() {
+  const name = $("modal-aussteller").value.trim();
+  const bezahlt = $("modal-bezahlt").checked;
+  const status = computeStatus(!!name, bezahlt);
+  const pill = $("modal-status-pill");
+  pill.textContent = status;
+  pill.dataset.status = status;
 }
 
 function closeModal() {
@@ -337,10 +387,10 @@ async function saveModal() {
   const info = state.standsByNr.get(standNr);
   if (!info) return closeModal();
 
-  const status = $("modal-status").value;
   const notes = $("modal-notes").value;
   const bezahlt = $("modal-bezahlt").checked;
   const ausstellerName = $("modal-aussteller").value.trim();
+  const status = computeStatus(!!ausstellerName, bezahlt);
 
   // Aussteller auflösen — wenn name leer → keine Verknüpfung, sonst suchen/anlegen
   let ausstellerIds = [];
@@ -389,6 +439,54 @@ async function saveModal() {
     enqueueUpdate({ recordId: info.recordId, fields });
     setSyncStatus("error");
   }
+}
+
+// === Foto: aufnehmen / hochladen ===
+async function handlePhotoChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const standNr = $("modal-stand-nr").textContent;
+  const info = state.standsByNr.get(String(standNr));
+  if (!info?.recordId) {
+    setPhotoStatus("Stand nicht in Airtable — Foto kann nicht hochgeladen werden.", true);
+    return;
+  }
+
+  // Vorschau lokal sofort anzeigen
+  const localUrl = URL.createObjectURL(file);
+  const preview = $("modal-photo-preview");
+  preview.src = localUrl;
+  preview.classList.remove("hidden");
+
+  setPhotoStatus("Lade Foto hoch …", false);
+  $("modal-photo-btn").disabled = true;
+
+  try {
+    const result = await uploadStandFoto(state.token, info.recordId, file);
+    // Response enthält die neue Attachment-URL — Foto-State updaten
+    const attachments = result?.fields?.[FOTO_FIELD_NAME];
+    const url = Array.isArray(attachments) ? attachments[0]?.url : null;
+    if (url) {
+      info.foto = url;
+      preview.src = url;
+    }
+    setPhotoStatus("Foto gespeichert ✓", false);
+  } catch (err) {
+    console.error("Foto-Upload fehlgeschlagen:", err);
+    let msg = err.message;
+    if (msg.includes("422") || msg.includes("INVALID_ATTACHMENT") || msg.includes("UNKNOWN_FIELD_NAME")) {
+      msg = `Foto-Feld "${FOTO_FIELD_NAME}" fehlt in Airtable. Anleitung siehe README.`;
+    }
+    setPhotoStatus(msg, true);
+  } finally {
+    $("modal-photo-btn").disabled = false;
+  }
+}
+
+function setPhotoStatus(text, isError) {
+  const el = $("modal-photo-status");
+  el.textContent = text;
+  el.classList.toggle("error", !!isError);
 }
 
 // === Suche ===
@@ -643,6 +741,13 @@ async function startApp() {
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
   });
+  // Status-Pill live aktualisieren wenn Aussteller oder Bezahlt geändert wird
+  $("modal-aussteller").addEventListener("input", updateStatusPill);
+  $("modal-bezahlt").addEventListener("change", updateStatusPill);
+  // Foto: Button öffnet File-Picker (Kamera auf iPad/iPhone)
+  $("modal-photo-btn").addEventListener("click", () => $("modal-photo-input").click());
+  $("modal-photo-input").addEventListener("change", handlePhotoChange);
+
   $("search").addEventListener("input", (e) => handleSearch(e.target.value));
   $("logout-btn").addEventListener("click", () => {
     if (confirm("Token entfernen und ausloggen?")) {

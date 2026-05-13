@@ -5,13 +5,17 @@ Visueller Saalplan für die Munich Watch Fair. Liest und schreibt live in Airtab
 ## Funktionen
 
 - 316 Stände in 10 Karrees + Außenreihen, exakt nach Plan-PDF
-- Klick auf Stand → Detail (Status, Aussteller, Notizen, Bezahlt)
-- Farbcodierung: grau = frei, grün = besetzt, gelb = reserviert, gelber Rahmen = bezahlt
+- Klick auf Stand → Detail (Aussteller, Bezahlt, Notizen, Foto)
+- **Status wird automatisch berechnet**:
+  - kein Aussteller → **frei** (grün)
+  - Aussteller + Bezahlt → **besetzt** (rot)
+  - Aussteller + nicht bezahlt → **reserviert** (gelb)
+- **Foto aufnehmen** vom Stand (Kamera auf iPad/iPhone) → wird in Airtable gespeichert
 - Suche nach Standnummer oder Aussteller-Name
 - Auto-Sync mit Airtable alle 30 Sekunden + Pull-to-refresh
 - Statistik-Leiste oben (besetzt / reserviert / frei)
 - Offline-tolerant: Änderungen werden gepuffert und beim Reconnect gesendet
-- Pinch-to-Zoom + Pan auf Mobile
+- Pinch-to-Zoom + Pan auf Mobile (mit Bounds — Plan nicht aus Container ziehbar)
 
 ## Technik
 
@@ -67,7 +71,20 @@ Nach 1–2 Minuten ist die App live unter:
 
 > **Wichtig**: Bei einem privaten Repo brauchst du einen kostenpflichtigen GitHub-Account (Pro/Team), damit GitHub Pages funktioniert. Falls das nicht geht, mach das Repo public — der Code enthält **keine** Tokens oder Aussteller-Daten, das ist OK.
 
-### 4. Airtable Personal Access Token erstellen
+### 4. Foto-Feld in Airtable anlegen (einmalig)
+
+Damit die Foto-Funktion funktioniert, brauchst du in der **Standplan**-Tabelle ein zusätzliches Feld:
+
+1. Airtable-Base „Munich Watch Fair - Standplan" öffnen
+2. Tabelle **Standplan** auswählen
+3. Ganz rechts auf das **+** klicken (neues Feld)
+4. Feldname: **Foto** (genau so, mit großem F)
+5. Feldtyp: **Attachment** auswählen
+6. Speichern
+
+Wenn das Feld anders heißen muss, sag mir Bescheid — ich passe `FOTO_FIELD_NAME` in [src/airtable.js](src/airtable.js) an.
+
+### 5. Airtable Personal Access Token erstellen
 
 1. Geh zu https://airtable.com/create/tokens
 2. Klick **„Create new token"**
@@ -78,7 +95,7 @@ Nach 1–2 Minuten ist die App live unter:
 
 > Der Token wird **NUR** lokal im Browser gespeichert (in `localStorage`). Er liegt **niemals** im Code oder im GitHub-Repo.
 
-### 5. App auf iPad/iPhone hinzufügen
+### 6. App auf iPad/iPhone hinzufügen
 
 1. Öffne `https://maxslobster.github.io/Saalplan-2026/` im **Safari** (nicht Chrome — sonst kein Home-Screen-Shortcut)
 2. Tippe auf das **Teilen-Icon** (Quadrat mit Pfeil nach oben)

@@ -68,19 +68,20 @@
       <h2 id="modal-title">Stand <span id="modal-stand-nr">–</span></h2>
       <p id="modal-error" class="error"></p>
 
-      <label class="field">
-        <span class="field-label">Status</span>
-        <select id="modal-status">
-          <option value="frei">frei</option>
-          <option value="besetzt">besetzt</option>
-          <option value="reserviert">reserviert</option>
-        </select>
-      </label>
+      <div class="field">
+        <span class="field-label">Status (automatisch)</span>
+        <span class="status-pill" id="modal-status-pill" data-status="frei">frei</span>
+      </div>
 
       <label class="field">
         <span class="field-label">Aussteller</span>
-        <input type="text" id="modal-aussteller" list="aussteller-list" placeholder="(leer = kein Aussteller)" autocomplete="off">
+        <input type="text" id="modal-aussteller" list="aussteller-list" placeholder="(leer = Stand frei)" autocomplete="off">
         <datalist id="aussteller-list"></datalist>
+      </label>
+
+      <label class="field checkbox-field">
+        <input type="checkbox" id="modal-bezahlt">
+        <span>Bezahlt (= besetzt)</span>
       </label>
 
       <label class="field">
@@ -88,10 +89,15 @@
         <textarea id="modal-notes" rows="3" placeholder="Optional…"></textarea>
       </label>
 
-      <label class="field checkbox-field">
-        <input type="checkbox" id="modal-bezahlt">
-        <span>Bezahlt</span>
-      </label>
+      <div class="field">
+        <span class="field-label">Foto</span>
+        <div class="photo-area">
+          <img id="modal-photo-preview" class="photo-preview hidden" alt="Stand-Foto">
+          <input type="file" id="modal-photo-input" accept="image/*" capture="environment" hidden>
+          <button type="button" id="modal-photo-btn" class="photo-btn">📷 Foto aufnehmen / hochladen</button>
+          <div id="modal-photo-status" class="photo-status"></div>
+        </div>
+      </div>
 
       <div class="modal-buttons">
         <button id="modal-cancel">Abbrechen</button>

@@ -169,9 +169,9 @@ header {
   content: "●";
   margin-right: 4px;
 }
-.stat.besetzt::before { color: #4caf50; }
+.stat.besetzt::before { color: #e53935; }
 .stat.reserviert::before { color: #ffb300; }
-.stat.frei::before { color: #555; }
+.stat.frei::before { color: #4caf50; }
 
 .sync-btn {
   display: flex;
@@ -238,8 +238,8 @@ g.stand { cursor: pointer; }
   stroke-width: 1;
   transition: fill 120ms ease, stroke 120ms ease;
 }
-.stand-rect[data-status="frei"] { fill: #3a3a3a; }
-.stand-rect[data-status="besetzt"] { fill: #2e6b32; }
+.stand-rect[data-status="frei"] { fill: #2e7d32; }
+.stand-rect[data-status="besetzt"] { fill: #c0392b; }
 .stand-rect[data-status="reserviert"] { fill: #b08400; }
 
 .stand-nr {
@@ -333,6 +333,55 @@ g.stand:active .stand-rect { opacity: 0.8; }
   cursor: pointer;
 }
 .checkbox-field input { width: 20px; height: 20px; accent-color: #f5b400; }
+
+/* Status-Pill (automatisch berechnet) */
+.status-pill {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: fit-content;
+}
+.status-pill[data-status="frei"]       { background: #2e7d32; color: #fff; }
+.status-pill[data-status="reserviert"] { background: #b08400; color: #fff; }
+.status-pill[data-status="besetzt"]    { background: #c0392b; color: #fff; }
+
+/* Foto-Bereich im Modal */
+.photo-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.photo-preview {
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  object-fit: cover;
+  background: #0d0d0d;
+}
+.photo-btn {
+  padding: 10px 14px;
+  background: #2a2a2a;
+  border: 1px dashed #555;
+  border-radius: 8px;
+  color: #f5b400;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+  text-align: center;
+}
+.photo-btn:active { background: #333; }
+.photo-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.photo-status {
+  font-size: 12px;
+  color: #888;
+  min-height: 16px;
+}
+.photo-status.error { color: #ff6b6b; }
 
 .modal-buttons {
   display: flex;
