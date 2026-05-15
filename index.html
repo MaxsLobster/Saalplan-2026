@@ -84,11 +84,6 @@
         <datalist id="aussteller-list"></datalist>
       </label>
 
-      <label class="field checkbox-field">
-        <input type="checkbox" id="modal-bezahlt">
-        <span>Bezahlt</span>
-      </label>
-
       <label class="field">
         <span class="field-label">Re-Nr (Rechnung)</span>
         <input type="text" id="modal-re-nr" placeholder="(leer = keine Rechnung)" autocomplete="off">
@@ -115,6 +110,7 @@
       <h2>⚠️ Sync-Diagnose</h2>
       <div id="error-content"></div>
       <div class="modal-buttons">
+        <button id="error-clear-queue">Queue leeren</button>
         <button id="error-clear">Logs leeren</button>
         <button id="error-retry" class="primary">Erneut versuchen</button>
         <button id="error-close">Schließen</button>

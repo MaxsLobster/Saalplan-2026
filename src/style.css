@@ -257,7 +257,6 @@ g.stand { cursor: pointer; }
   pointer-events: none;
 }
 
-g.stand.bezahlt .stand-rect { stroke: #f5b400; stroke-width: 2; }
 /* Re-Nr vorhanden → ganzer Stand blau (überschreibt Status-Farbe).
    So sieht man auf einen Blick wer schon eine Rechnung hat. */
 g.stand.has-rechnung .stand-rect {

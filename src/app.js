@@ -24,7 +24,7 @@ const ERROR_LOG_MAX = 50;
 // === App-State ===
 const state = {
   token: null,
-  standsByNr: new Map(),       // standNr -> { recordId, status, ausstellerIds, notes, bezahlt }
+  standsByNr: new Map(),       // standNr -> { recordId, status, ausstellerIds, notes, reNr }
   ausstellerById: new Map(),    // recordId -> { firmenname, notizen }
   ausstellerByName: new Map(),  // firmenname (lowercase) -> recordId
   syncTimer: null,
@@ -145,14 +145,12 @@ function closeErrorDialog() {
 }
 
 // === Status-Automatik ===
-// Status-VORSCHLAG aus (Aussteller, Bezahlt) — kann im Modal-Dropdown
-// manuell überschrieben werden:
-//   kein Aussteller          → frei
-//   Aussteller + bezahlt     → besetzt
-//   Aussteller + nicht bezahlt → reserviert
-function computeStatus(hasAussteller, bezahlt) {
-  if (!hasAussteller) return "frei";
-  return bezahlt ? "besetzt" : "reserviert";
+// Status-VORSCHLAG aus Aussteller — kann im Modal-Dropdown manuell
+// überschrieben werden (für "besetzt"):
+//   kein Aussteller → frei
+//   Aussteller       → reserviert (User kann manuell auf "besetzt" setzen)
+function computeStatus(hasAussteller) {
+  return hasAussteller ? "reserviert" : "frei";
 }
 
 // Markiert, ob der User den Status-Dropdown im aktuellen Modal manuell
@@ -181,6 +179,9 @@ function loadQueue() {
 function saveQueue(queue) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
+function clearQueue() {
+  localStorage.removeItem(QUEUE_KEY);
+}
 function enqueueUpdate(update) {
   const queue = loadQueue();
   // Letzten Eintrag für denselben Record überschreiben (Coalescing)
@@ -188,6 +189,30 @@ function enqueueUpdate(update) {
   if (idx >= 0) queue[idx] = update;
   else queue.push(update);
   saveQueue(queue);
+}
+
+// Beim App-Start: alle Queue-Einträge mit unbekannten Field-IDs entfernen
+// (z.B. nach Schema-Änderung in Airtable wie das gelöschte Bezahlt-Feld).
+function pruneStaleQueueEntries() {
+  const queue = loadQueue();
+  if (queue.length === 0) return;
+  const validFieldIds = new Set(Object.values(FIELDS));
+  const cleaned = [];
+  let removed = 0;
+  for (const u of queue) {
+    const fieldKeys = Object.keys(u.fields || {});
+    const hasStaleFields = fieldKeys.some((k) => !validFieldIds.has(k));
+    if (hasStaleFields) {
+      removed++;
+      logError("queue", `Queue-Eintrag verworfen (enthält unbekannte Field-IDs): ${u.recordId}`, JSON.stringify(fieldKeys));
+    } else {
+      cleaned.push(u);
+    }
+  }
+  if (removed > 0) {
+    saveQueue(cleaned);
+    console.log(`[INIT] ${removed} veraltete(s) Queue-Update(s) entfernt.`);
+  }
 }
 async function flushQueue() {
   let queue = loadQueue();
@@ -307,7 +332,6 @@ function refreshStandsVisual() {
       g.querySelector(".stand-nr").setAttribute("y", (CELL_H - 1) / 2 + 1);
     }
 
-    g.classList.toggle("bezahlt", !!info.bezahlt);
     g.classList.toggle("has-rechnung", !!info.reNr);
     g.classList.toggle("highlight", state.searchHighlight.has(String(standNr)));
     g.classList.toggle("selected", String(standNr) === String(state.selectedStandNr));
@@ -318,12 +342,11 @@ function refreshStandsVisual() {
 function refreshStats() {
   let frei = 0, besetzt = 0, reserviert = 0, rechnungOffen = 0;
   for (const info of state.standsByNr.values()) {
-    if (info.status === "besetzt") {
-      besetzt++;
-      if (!info.reNr) rechnungOffen++;
-    }
+    if (info.status === "besetzt") besetzt++;
     else if (info.status === "reserviert") reserviert++;
     else frei++;
+    // Re-Nr offen: jeder Stand mit Aussteller aber ohne Re-Nr
+    if (info.ausstellerIds?.length > 0 && !info.reNr) rechnungOffen++;
   }
   // Stände, die nicht in Airtable existieren, gelten als frei
   const layoutTotal = Object.keys(STAND_LAYOUT).length;
@@ -366,7 +389,6 @@ async function syncFromAirtable() {
         status: r.fields[FIELDS.status] || "frei",
         ausstellerIds: r.fields[FIELDS.aussteller] || [],
         notes: r.fields[FIELDS.notes] || "",
-        bezahlt: !!r.fields[FIELDS.bezahlt],
         reNr: r.fields[FIELDS.re_nr] || "",
       });
     }
@@ -431,7 +453,6 @@ function openModal(standNr) {
     status: "frei",
     ausstellerIds: [],
     notes: "",
-    bezahlt: false,
     reNr: "",
   };
 
@@ -441,7 +462,6 @@ function openModal(standNr) {
     ? state.ausstellerById.get(firstId)?.firmenname || ""
     : "";
   $("modal-notes").value = info.notes || "";
-  $("modal-bezahlt").checked = !!info.bezahlt;
   $("modal-re-nr").value = info.reNr || "";
   $("modal-error").textContent = "";
 
@@ -450,12 +470,11 @@ function openModal(standNr) {
   // → automatisch korrigieren, User muss nur noch Speichern klicken.
   modalStatusManuallyChanged = false;
   const hasAussteller = !!firstId;
-  const autoStatus = computeStatus(hasAussteller, !!info.bezahlt);
   const airtableStatus = info.status || "frei";
   const inconsistent =
     (hasAussteller && airtableStatus === "frei") ||
     (!hasAussteller && airtableStatus !== "frei");
-  $("modal-status").value = inconsistent ? autoStatus : airtableStatus;
+  $("modal-status").value = inconsistent ? computeStatus(hasAussteller) : airtableStatus;
 
   if (!info.recordId) {
     $("modal-error").textContent =
@@ -468,14 +487,12 @@ function openModal(standNr) {
   $("modal").classList.remove("hidden");
 }
 
-// Wird bei Aussteller- oder Bezahlt-Änderung aufgerufen:
-// schlägt einen neuen Status vor, aber nur wenn der User den Dropdown
-// NICHT bereits manuell überschrieben hat.
+// Wird bei Aussteller-Änderung aufgerufen: schlägt einen neuen Status vor,
+// aber nur wenn der User den Dropdown NICHT bereits manuell überschrieben hat.
 function suggestStatusFromInputs() {
   if (modalStatusManuallyChanged) return;
   const name = $("modal-aussteller").value.trim();
-  const bezahlt = $("modal-bezahlt").checked;
-  $("modal-status").value = computeStatus(!!name, bezahlt);
+  $("modal-status").value = computeStatus(!!name);
 }
 
 function closeModal() {
@@ -491,7 +508,6 @@ async function saveModal() {
   if (!info) return closeModal();
 
   const notes = $("modal-notes").value;
-  const bezahlt = $("modal-bezahlt").checked;
   const reNr = $("modal-re-nr").value.trim();
   const ausstellerName = $("modal-aussteller").value.trim();
   // Status: nimm den Wert aus dem Dropdown (User-Override möglich).
@@ -523,7 +539,6 @@ async function saveModal() {
     [FIELDS.status]: status,
     [FIELDS.aussteller]: ausstellerIds,
     [FIELDS.notes]: notes,
-    [FIELDS.bezahlt]: bezahlt,
     [FIELDS.re_nr]: reNr,
   };
 
@@ -532,7 +547,6 @@ async function saveModal() {
     status: info.status,
     ausstellerIds: info.ausstellerIds,
     notes: info.notes,
-    bezahlt: info.bezahlt,
     reNr: info.reNr,
   };
 
@@ -540,7 +554,6 @@ async function saveModal() {
   info.status = status;
   info.ausstellerIds = ausstellerIds;
   info.notes = notes;
-  info.bezahlt = bezahlt;
   info.reNr = reNr;
   refreshStandsVisual();
   refreshStats();
@@ -563,7 +576,6 @@ async function saveModal() {
     info.status = before.status;
     info.ausstellerIds = before.ausstellerIds;
     info.notes = before.notes;
-    info.bezahlt = before.bezahlt;
     info.reNr = before.reNr;
     refreshStandsVisual();
     refreshStats();
@@ -842,9 +854,8 @@ async function startApp() {
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
   });
-  // Status-Vorschlag aktualisieren wenn Aussteller oder Bezahlt sich ändert
+  // Status-Vorschlag aktualisieren wenn Aussteller sich ändert
   $("modal-aussteller").addEventListener("input", suggestStatusFromInputs);
-  $("modal-bezahlt").addEventListener("change", suggestStatusFromInputs);
   // Manuelles Ändern des Status: respektieren, keine Auto-Überschreibung mehr
   $("modal-status").addEventListener("change", () => {
     modalStatusManuallyChanged = true;
@@ -870,6 +881,17 @@ async function startApp() {
     clearErrorLog();
     showErrorDialog(); // refresh
   });
+  $("error-clear-queue").addEventListener("click", () => {
+    const n = loadQueue().length;
+    if (n === 0) {
+      showToast("Queue ist leer.", "info", 2000);
+      return;
+    }
+    if (!confirm(`${n} ausstehende Updates wirklich verwerfen?\n(Lokale Änderungen sind dann weg.)`)) return;
+    clearQueue();
+    showErrorDialog(); // refresh
+    showToast(`${n} Queue-Einträge gelöscht.`, "info", 3000);
+  });
   $("error-retry").addEventListener("click", async () => {
     closeErrorDialog();
     showToast("Versuche erneut zu synchronisieren …", "info", 2000);
@@ -883,6 +905,8 @@ async function startApp() {
     }
   });
 
+  // Veraltete Queue-Einträge (z.B. mit gelöschten Field-IDs) entfernen
+  pruneStaleQueueEntries();
   // Erste Synchronisation + Queue flushen
   await flushQueue();
   await syncFromAirtable();
