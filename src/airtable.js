@@ -10,6 +10,7 @@ export const FIELDS = {
   status: "fldzNYM0enUAdYmnw",
   aussteller: "flda44845oVa3pKx2",
   notes: "flddQW3eixZuAMj3T",
+  bezahlt: "fldzj48Cmduoo4pkg",
   re_nr: "fldrUNX5vZcoAiX5i",
   firmenname: "fldx7M45sZshwe0h8",
   aussteller_notizen: "fldPPJxBgu3jpzkLV",

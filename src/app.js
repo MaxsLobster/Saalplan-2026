@@ -24,7 +24,7 @@ const ERROR_LOG_MAX = 50;
 // === App-State ===
 const state = {
   token: null,
-  standsByNr: new Map(),       // standNr -> { recordId, status, ausstellerIds, notes, reNr }
+  standsByNr: new Map(),       // standNr -> { recordId, status, ausstellerIds, notes, bezahlt, reNr }
   ausstellerById: new Map(),    // recordId -> { firmenname, notizen }
   ausstellerByName: new Map(),  // firmenname (lowercase) -> recordId
   syncTimer: null,
@@ -145,12 +145,14 @@ function closeErrorDialog() {
 }
 
 // === Status-Automatik ===
-// Status-VORSCHLAG aus Aussteller — kann im Modal-Dropdown manuell
-// überschrieben werden (für "besetzt"):
-//   kein Aussteller → frei
-//   Aussteller       → reserviert (User kann manuell auf "besetzt" setzen)
-function computeStatus(hasAussteller) {
-  return hasAussteller ? "reserviert" : "frei";
+// Status-VORSCHLAG aus (Aussteller, Bezahlt) — kann im Modal-Dropdown
+// manuell überschrieben werden:
+//   kein Aussteller          → frei
+//   Aussteller + bezahlt     → besetzt
+//   Aussteller + nicht bezahlt → reserviert
+function computeStatus(hasAussteller, bezahlt) {
+  if (!hasAussteller) return "frei";
+  return bezahlt ? "besetzt" : "reserviert";
 }
 
 // Markiert, ob der User den Status-Dropdown im aktuellen Modal manuell
@@ -215,6 +217,8 @@ function pruneStaleQueueEntries() {
   }
 }
 async function flushQueue() {
+  // Vor jedem Flush stale Einträge entfernen (z.B. nach Schema-Änderung)
+  pruneStaleQueueEntries();
   let queue = loadQueue();
   if (queue.length === 0) return;
   const remaining = [];
@@ -389,6 +393,7 @@ async function syncFromAirtable() {
         status: r.fields[FIELDS.status] || "frei",
         ausstellerIds: r.fields[FIELDS.aussteller] || [],
         notes: r.fields[FIELDS.notes] || "",
+        bezahlt: !!r.fields[FIELDS.bezahlt],
         reNr: r.fields[FIELDS.re_nr] || "",
       });
     }
@@ -453,6 +458,7 @@ function openModal(standNr) {
     status: "frei",
     ausstellerIds: [],
     notes: "",
+    bezahlt: false,
     reNr: "",
   };
 
@@ -462,6 +468,7 @@ function openModal(standNr) {
     ? state.ausstellerById.get(firstId)?.firmenname || ""
     : "";
   $("modal-notes").value = info.notes || "";
+  $("modal-bezahlt").checked = !!info.bezahlt;
   $("modal-re-nr").value = info.reNr || "";
   $("modal-error").textContent = "";
 
@@ -474,7 +481,9 @@ function openModal(standNr) {
   const inconsistent =
     (hasAussteller && airtableStatus === "frei") ||
     (!hasAussteller && airtableStatus !== "frei");
-  $("modal-status").value = inconsistent ? computeStatus(hasAussteller) : airtableStatus;
+  $("modal-status").value = inconsistent
+    ? computeStatus(hasAussteller, !!info.bezahlt)
+    : airtableStatus;
 
   if (!info.recordId) {
     $("modal-error").textContent =
@@ -487,12 +496,14 @@ function openModal(standNr) {
   $("modal").classList.remove("hidden");
 }
 
-// Wird bei Aussteller-Änderung aufgerufen: schlägt einen neuen Status vor,
-// aber nur wenn der User den Dropdown NICHT bereits manuell überschrieben hat.
+// Wird bei Aussteller- oder Bezahlt-Änderung aufgerufen: schlägt einen neuen
+// Status vor, aber nur wenn der User den Dropdown NICHT bereits manuell
+// überschrieben hat.
 function suggestStatusFromInputs() {
   if (modalStatusManuallyChanged) return;
   const name = $("modal-aussteller").value.trim();
-  $("modal-status").value = computeStatus(!!name);
+  const bezahlt = $("modal-bezahlt").checked;
+  $("modal-status").value = computeStatus(!!name, bezahlt);
 }
 
 function closeModal() {
@@ -508,6 +519,7 @@ async function saveModal() {
   if (!info) return closeModal();
 
   const notes = $("modal-notes").value;
+  const bezahlt = $("modal-bezahlt").checked;
   const reNr = $("modal-re-nr").value.trim();
   const ausstellerName = $("modal-aussteller").value.trim();
   // Status: nimm den Wert aus dem Dropdown (User-Override möglich).
@@ -539,6 +551,7 @@ async function saveModal() {
     [FIELDS.status]: status,
     [FIELDS.aussteller]: ausstellerIds,
     [FIELDS.notes]: notes,
+    [FIELDS.bezahlt]: bezahlt,
     [FIELDS.re_nr]: reNr,
   };
 
@@ -547,6 +560,7 @@ async function saveModal() {
     status: info.status,
     ausstellerIds: info.ausstellerIds,
     notes: info.notes,
+    bezahlt: info.bezahlt,
     reNr: info.reNr,
   };
 
@@ -554,6 +568,7 @@ async function saveModal() {
   info.status = status;
   info.ausstellerIds = ausstellerIds;
   info.notes = notes;
+  info.bezahlt = bezahlt;
   info.reNr = reNr;
   refreshStandsVisual();
   refreshStats();
@@ -576,6 +591,7 @@ async function saveModal() {
     info.status = before.status;
     info.ausstellerIds = before.ausstellerIds;
     info.notes = before.notes;
+    info.bezahlt = before.bezahlt;
     info.reNr = before.reNr;
     refreshStandsVisual();
     refreshStats();
@@ -854,8 +870,9 @@ async function startApp() {
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
   });
-  // Status-Vorschlag aktualisieren wenn Aussteller sich ändert
+  // Status-Vorschlag aktualisieren wenn Aussteller oder Bezahlt sich ändert
   $("modal-aussteller").addEventListener("input", suggestStatusFromInputs);
+  $("modal-bezahlt").addEventListener("change", suggestStatusFromInputs);
   // Manuelles Ändern des Status: respektieren, keine Auto-Überschreibung mehr
   $("modal-status").addEventListener("change", () => {
     modalStatusManuallyChanged = true;
