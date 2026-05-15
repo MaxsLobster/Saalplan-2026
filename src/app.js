@@ -18,6 +18,8 @@ const PLAN_H = ROWS * CELL_H;
 const SYNC_INTERVAL_MS = 30_000;
 const TOKEN_KEY = "saalplan_token_v1";
 const QUEUE_KEY = "saalplan_queue_v1";
+const ERROR_LOG_KEY = "saalplan_errors_v1";
+const ERROR_LOG_MAX = 50;
 
 // === App-State ===
 const state = {
@@ -28,6 +30,7 @@ const state = {
   syncTimer: null,
   lastSyncTime: null,
   syncError: null,
+  lastError: null, // { type, message, details, at }
   searchHighlight: new Set(),   // Set of standNr strings
   selectedStandNr: null,
 };
@@ -49,6 +52,96 @@ function showToast(message, kind = "info", durationMs = 3000) {
   el.className = kind; // success | error | info
   el.classList.remove("hidden");
   _toastTimer = setTimeout(() => el.classList.add("hidden"), durationMs);
+}
+
+// === Error-Logging (max 50 Einträge in localStorage) ===
+function loadErrorLog() {
+  try {
+    return JSON.parse(localStorage.getItem(ERROR_LOG_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+function logError(type, message, details) {
+  const log = loadErrorLog();
+  const entry = {
+    at: new Date().toISOString(),
+    type, // "save" | "sync" | "queue"
+    message: String(message || ""),
+    details: details ? String(details) : "",
+  };
+  log.unshift(entry);
+  if (log.length > ERROR_LOG_MAX) log.length = ERROR_LOG_MAX;
+  try {
+    localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+  } catch (e) {
+    console.warn("Konnte Error-Log nicht speichern:", e);
+  }
+  state.lastError = entry;
+  console.error(`[${type}]`, message, details || "");
+}
+function clearErrorLog() {
+  localStorage.removeItem(ERROR_LOG_KEY);
+  state.lastError = null;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+// === Fehler-Diagnose-Dialog ===
+function showErrorDialog() {
+  const log = loadErrorLog();
+  const last = state.lastError;
+  const queueLen = loadQueue().length;
+  let html = "";
+
+  // Status-Übersicht
+  html += `<h3>Status</h3><p style="font-size:13px;">`;
+  if (last) {
+    html += `Letzter Fehler: <strong style="color:#ff6b6b;">${escapeHtml(last.type)}</strong> · `;
+  } else {
+    html += `<span style="color:#4caf50;">Aktuell keine Fehler.</span> · `;
+  }
+  html += `${queueLen} ausstehende Updates in Queue · `;
+  html += state.lastSyncTime
+    ? `letzter Sync: ${new Date(state.lastSyncTime).toLocaleTimeString("de-DE")}`
+    : `noch nicht synchronisiert`;
+  html += `</p>`;
+
+  // Letzter Fehler — Details
+  if (last) {
+    html += `<h3>Letzter Fehler — Details</h3>`;
+    html += `<p class="error-time">${new Date(last.at).toLocaleString("de-DE")}</p>`;
+    html += `<p class="error-msg">${escapeHtml(last.message)}</p>`;
+    if (last.details) {
+      html += `<pre class="error-details">${escapeHtml(last.details)}</pre>`;
+    }
+  }
+
+  // Log-Historie
+  if (log.length > 0) {
+    html += `<h3>Letzte ${log.length} Ereignisse</h3>`;
+    html += `<ul class="error-log-list">`;
+    for (const e of log) {
+      const t = new Date(e.at).toLocaleString("de-DE", {
+        day: "2-digit", month: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      });
+      html += `<li><span class="log-time">${t}</span><span class="log-type">[${escapeHtml(e.type)}]</span>${escapeHtml(e.message)}</li>`;
+    }
+    html += `</ul>`;
+  } else {
+    html += `<p style="color:#888; font-size:13px;">Noch keine Log-Einträge.</p>`;
+  }
+
+  $("error-content").innerHTML = html;
+  $("error-modal").classList.remove("hidden");
+}
+function closeErrorDialog() {
+  $("error-modal").classList.add("hidden");
 }
 
 // === Status-Automatik ===
@@ -104,7 +197,7 @@ async function flushQueue() {
     try {
       await updateStandplanRecord(state.token, update.recordId, update.fields);
     } catch (err) {
-      console.error("Queue-Flush fehlgeschlagen:", err);
+      logError("queue", `Queue-Update fehlgeschlagen für Record ${update.recordId}`, err.message);
       remaining.push(update);
     }
   }
@@ -286,8 +379,8 @@ async function syncFromAirtable() {
     state.syncError = null;
     setSyncStatus("ok");
   } catch (err) {
-    console.error("Sync fehlgeschlagen:", err);
     state.syncError = err.message;
+    logError("sync", "Sync von Airtable fehlgeschlagen", err.message);
     setSyncStatus("error");
   }
 }
@@ -465,7 +558,7 @@ async function saveModal() {
     showToast(`Stand ${standNr} gespeichert ✓`, "success");
     closeModal();
   } catch (err) {
-    console.error("[SAVE] FEHLER:", err);
+    logError("save", `Stand ${standNr}: Speichern fehlgeschlagen`, err.message);
     // Optimistic Update rückgängig
     info.status = before.status;
     info.ausstellerIds = before.ausstellerIds;
@@ -477,7 +570,7 @@ async function saveModal() {
     // Update in Queue für späteren Retry
     enqueueUpdate({ recordId: info.recordId, fields });
     setSyncStatus("error");
-    showToast(`Speichern fehlgeschlagen: ${err.message}`, "error", 10000);
+    showToast(`Speichern fehlgeschlagen — Tipp auf den roten Punkt für Details`, "error", 10000);
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = "Speichern";
@@ -764,11 +857,29 @@ async function startApp() {
       location.reload();
     }
   });
-  $("sync-status").addEventListener("click", () => {
-    if (state.syncError) {
-      alert(`Sync-Fehler:\n\n${state.syncError}`);
-    } else {
-      syncFromAirtable();
+  // Klick auf Sync-Status → Fehler-Diagnose-Modal (immer)
+  $("sync-status").addEventListener("click", showErrorDialog);
+  // Backdrop-Click schließt das Diagnose-Modal
+  $("error-modal").addEventListener("click", (e) => {
+    if (e.target.id === "error-modal") closeErrorDialog();
+  });
+  // Buttons im Diagnose-Modal
+  $("error-close").addEventListener("click", closeErrorDialog);
+  $("error-clear").addEventListener("click", () => {
+    if (!confirm("Alle Fehler-Logs wirklich löschen?")) return;
+    clearErrorLog();
+    showErrorDialog(); // refresh
+  });
+  $("error-retry").addEventListener("click", async () => {
+    closeErrorDialog();
+    showToast("Versuche erneut zu synchronisieren …", "info", 2000);
+    await flushQueue();
+    await syncFromAirtable();
+    const remaining = loadQueue().length;
+    if (remaining === 0 && !state.syncError) {
+      showToast("Alles erfolgreich synchronisiert ✓", "success", 4000);
+    } else if (remaining > 0) {
+      showToast(`${remaining} Updates noch hängend — Diagnose öffnen für Details`, "error", 6000);
     }
   });
 

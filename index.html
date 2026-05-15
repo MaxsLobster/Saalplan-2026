@@ -109,6 +109,19 @@
   <!-- Toast für Speicher-Feedback -->
   <div id="toast" class="hidden"></div>
 
+  <!-- Fehler-Diagnose-Modal -->
+  <div id="error-modal" class="hidden">
+    <div class="modal-content error-modal-content">
+      <h2>⚠️ Sync-Diagnose</h2>
+      <div id="error-content"></div>
+      <div class="modal-buttons">
+        <button id="error-clear">Logs leeren</button>
+        <button id="error-retry" class="primary">Erneut versuchen</button>
+        <button id="error-close">Schließen</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="src/app.js"></script>
 </body>
 </html>
