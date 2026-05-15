@@ -172,6 +172,7 @@ header {
 .stat.besetzt::before { color: #e53935; }
 .stat.reserviert::before { color: #ffb300; }
 .stat.frei::before { color: #4caf50; }
+.stat.rechnung-offen::before { color: #3498db; }
 
 .sync-btn {
   display: flex;
@@ -257,6 +258,10 @@ g.stand { cursor: pointer; }
 }
 
 g.stand.bezahlt .stand-rect { stroke: #f5b400; stroke-width: 2; }
+g.stand.has-rechnung .stand-rect {
+  stroke: #3498db;
+  stroke-width: 2.5;
+}
 g.stand.highlight .stand-rect {
   stroke: #f5b400;
   stroke-width: 3;

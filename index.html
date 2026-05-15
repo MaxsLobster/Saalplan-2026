@@ -49,6 +49,7 @@
           <span id="stats-besetzt" class="stat besetzt">– besetzt</span>
           <span id="stats-reserviert" class="stat reserviert">– reserviert</span>
           <span id="stats-frei" class="stat frei">– frei</span>
+          <span id="stats-rechnung-offen" class="stat rechnung-offen" title="Besetzt, aber noch keine Re-Nr">– Re offen</span>
         </div>
         <button id="sync-status" class="sync-btn" title="Sync-Status (klicken zum Aktualisieren)">
           <span id="sync-indicator" data-status="syncing">●</span>
@@ -86,6 +87,11 @@
       <label class="field checkbox-field">
         <input type="checkbox" id="modal-bezahlt">
         <span>Bezahlt</span>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Re-Nr (Rechnung)</span>
+        <input type="text" id="modal-re-nr" placeholder="(leer = keine Rechnung)" autocomplete="off">
       </label>
 
       <label class="field">

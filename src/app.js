@@ -199,6 +199,7 @@ function refreshStandsVisual() {
     }
 
     g.classList.toggle("bezahlt", !!info.bezahlt);
+    g.classList.toggle("has-rechnung", !!info.reNr);
     g.classList.toggle("highlight", state.searchHighlight.has(String(standNr)));
     g.classList.toggle("selected", String(standNr) === String(state.selectedStandNr));
   }
@@ -206,9 +207,12 @@ function refreshStandsVisual() {
 
 // === Statistik aktualisieren ===
 function refreshStats() {
-  let frei = 0, besetzt = 0, reserviert = 0;
+  let frei = 0, besetzt = 0, reserviert = 0, rechnungOffen = 0;
   for (const info of state.standsByNr.values()) {
-    if (info.status === "besetzt") besetzt++;
+    if (info.status === "besetzt") {
+      besetzt++;
+      if (!info.reNr) rechnungOffen++;
+    }
     else if (info.status === "reserviert") reserviert++;
     else frei++;
   }
@@ -220,6 +224,7 @@ function refreshStats() {
   $("stats-besetzt").textContent = `${besetzt} besetzt`;
   $("stats-reserviert").textContent = `${reserviert} reserviert`;
   $("stats-frei").textContent = `${frei} frei`;
+  $("stats-rechnung-offen").textContent = `${rechnungOffen} Re offen`;
   $("stats-total").textContent = `${besetzt + reserviert} / ${layoutTotal}`;
 }
 
@@ -253,6 +258,7 @@ async function syncFromAirtable() {
         ausstellerIds: r.fields[FIELDS.aussteller] || [],
         notes: r.fields[FIELDS.notes] || "",
         bezahlt: !!r.fields[FIELDS.bezahlt],
+        reNr: r.fields[FIELDS.re_nr] || "",
       });
     }
 
@@ -317,6 +323,7 @@ function openModal(standNr) {
     ausstellerIds: [],
     notes: "",
     bezahlt: false,
+    reNr: "",
   };
 
   $("modal-stand-nr").textContent = standNr;
@@ -326,6 +333,7 @@ function openModal(standNr) {
     : "";
   $("modal-notes").value = info.notes || "";
   $("modal-bezahlt").checked = !!info.bezahlt;
+  $("modal-re-nr").value = info.reNr || "";
   $("modal-error").textContent = "";
 
   // Status-Dropdown initial setzen.
@@ -375,6 +383,7 @@ async function saveModal() {
 
   const notes = $("modal-notes").value;
   const bezahlt = $("modal-bezahlt").checked;
+  const reNr = $("modal-re-nr").value.trim();
   const ausstellerName = $("modal-aussteller").value.trim();
   // Status: nimm den Wert aus dem Dropdown (User-Override möglich).
   const status = $("modal-status").value;
@@ -406,6 +415,7 @@ async function saveModal() {
     [FIELDS.aussteller]: ausstellerIds,
     [FIELDS.notes]: notes,
     [FIELDS.bezahlt]: bezahlt,
+    [FIELDS.re_nr]: reNr,
   };
 
   // Optimistisches Update
@@ -413,6 +423,7 @@ async function saveModal() {
   info.ausstellerIds = ausstellerIds;
   info.notes = notes;
   info.bezahlt = bezahlt;
+  info.reNr = reNr;
   refreshStandsVisual();
   refreshStats();
   closeModal();
