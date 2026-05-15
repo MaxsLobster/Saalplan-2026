@@ -35,6 +35,22 @@ const state = {
 // === DOM-Referenzen ===
 const $ = (id) => document.getElementById(id);
 
+// === Toast (sichtbares Feedback bei Speicher-Aktionen) ===
+let _toastTimer = null;
+function showToast(message, kind = "info", durationMs = 3000) {
+  const el = $("toast");
+  if (!el) {
+    console.warn("toast element missing — fallback alert:", message);
+    if (kind === "error") alert(message);
+    return;
+  }
+  if (_toastTimer) clearTimeout(_toastTimer);
+  el.textContent = message;
+  el.className = kind; // success | error | info
+  el.classList.remove("hidden");
+  _toastTimer = setTimeout(() => el.classList.add("hidden"), durationMs);
+}
+
 // === Status-Automatik ===
 // Status-VORSCHLAG aus (Aussteller, Bezahlt) — kann im Modal-Dropdown
 // manuell überschrieben werden:
@@ -418,7 +434,16 @@ async function saveModal() {
     [FIELDS.re_nr]: reNr,
   };
 
-  // Optimistisches Update
+  // Snapshot des aktuellen Zustands (für Rollback bei Fehler)
+  const before = {
+    status: info.status,
+    ausstellerIds: info.ausstellerIds,
+    notes: info.notes,
+    bezahlt: info.bezahlt,
+    reNr: info.reNr,
+  };
+
+  // Optimistisches Update auf dem Plan (Modal bleibt offen bis Antwort da)
   info.status = status;
   info.ausstellerIds = ausstellerIds;
   info.notes = notes;
@@ -426,16 +451,36 @@ async function saveModal() {
   info.reNr = reNr;
   refreshStandsVisual();
   refreshStats();
-  closeModal();
 
-  // An Airtable senden — bei Fehler in Queue
+  // Speichern-Button während Request deaktivieren
+  const saveBtn = $("modal-save");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Speichere …";
+
   try {
-    await updateStandplanRecord(state.token, info.recordId, fields);
+    console.log("[SAVE] PATCH Stand", standNr, "fields:", fields);
+    const result = await updateStandplanRecord(state.token, info.recordId, fields);
+    console.log("[SAVE] OK", result);
     setSyncStatus("ok");
+    showToast(`Stand ${standNr} gespeichert ✓`, "success");
+    closeModal();
   } catch (err) {
-    console.error("Speichern fehlgeschlagen — in Queue:", err);
+    console.error("[SAVE] FEHLER:", err);
+    // Optimistic Update rückgängig
+    info.status = before.status;
+    info.ausstellerIds = before.ausstellerIds;
+    info.notes = before.notes;
+    info.bezahlt = before.bezahlt;
+    info.reNr = before.reNr;
+    refreshStandsVisual();
+    refreshStats();
+    // Update in Queue für späteren Retry
     enqueueUpdate({ recordId: info.recordId, fields });
     setSyncStatus("error");
+    showToast(`Speichern fehlgeschlagen: ${err.message}`, "error", 10000);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Speichern";
   }
 }
 

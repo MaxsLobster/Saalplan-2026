@@ -47,13 +47,15 @@ export async function listAllRecords(token, tableId) {
   return all;
 }
 
-// Standplan-Record updaten
+// Standplan-Record updaten.
+// WICHTIG: returnFieldsByFieldId NUR als URL-Param, NICHT im Body —
+// sonst wirft Airtable 422 INVALID_REQUEST_BODY.
 export async function updateStandplanRecord(token, recordId, fields) {
   const url = `${BASE_URL}/${BASE_ID}/${STANDPLAN_TABLE}/${recordId}?returnFieldsByFieldId=true`;
   const res = await fetch(url, {
     method: "PATCH",
     headers: authHeaders(token),
-    body: JSON.stringify({ fields, returnFieldsByFieldId: true }),
+    body: JSON.stringify({ fields, typecast: true }),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -70,7 +72,7 @@ export async function createAussteller(token, firmenname) {
     headers: authHeaders(token),
     body: JSON.stringify({
       fields: { [FIELDS.firmenname]: firmenname },
-      returnFieldsByFieldId: true,
+      typecast: true,
     }),
   });
   if (!res.ok) {

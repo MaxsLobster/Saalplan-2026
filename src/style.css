@@ -346,6 +346,29 @@ g.stand:active .stand-rect { opacity: 0.8; }
   font-size: 15px;
 }
 
+/* Toast für Speicher-Feedback */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: 90%;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 200ms ease;
+  word-break: break-word;
+}
+#toast.hidden { opacity: 0; pointer-events: none; }
+#toast.success { background: #2e7d32; color: #fff; }
+#toast.error   { background: #c0392b; color: #fff; max-width: 600px; }
+#toast.info    { background: #2980b9; color: #fff; }
+
 .modal-buttons {
   display: flex;
   gap: 10px;
