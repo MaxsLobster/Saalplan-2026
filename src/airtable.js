@@ -2,16 +2,16 @@
 // Nutzt Field-IDs statt Field-Namen, damit Umbenennen in Airtable die App nicht bricht.
 
 export const BASE_ID = "appzM35eYQFe9a5mr";
-export const STANDPLAN_TABLE = "tblkOneCVJYxtF02Q";
+export const STANDPLAN_TABLE = "tblezraapUH2e1aqc";
 export const AUSSTELLER_TABLE = "tbl4mVnPf7GaX7VAU";
 
 export const FIELDS = {
-  standnummer: "fldlygk7GHnebSxuO",
-  status: "fldzNYM0enUAdYmnw",
-  aussteller: "flda44845oVa3pKx2",
-  notes: "flddQW3eixZuAMj3T",
-  bezahlt: "fldzj48Cmduoo4pkg",
-  re_nr: "fldrUNX5vZcoAiX5i",
+  standnummer: "fldkqedo0fZtpkQw9",
+  status: "fldO5xicwE0H1OKZ3",
+  aussteller: "fldHLgZvOroDbwZjD",
+  notes: "fldmqy58LIYw4yaXX",
+  bezahlt: "fld6s6yIQPBDIX1to",
+  re_nr: "fld5MiQkvOjL7hucO",
   firmenname: "fldx7M45sZshwe0h8",
   aussteller_notizen: "fldPPJxBgu3jpzkLV",
 };
