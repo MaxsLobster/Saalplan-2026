@@ -149,6 +149,16 @@ header {
   line-height: 1;
 }
 .icon-btn:active { background: #333; }
+.plan-select {
+  padding: 4px 6px;
+  background: #2a2a2a;
+  border: none;
+  border-radius: 6px;
+  color: #aaa;
+  font-size: 12px;
+  max-width: 140px;
+}
+.plan-select:focus { outline: none; box-shadow: 0 0 0 1px #f5b400; }
 
 .header-bottom {
   display: flex;

@@ -5,6 +5,7 @@ Visueller Saalplan für die Munich Watch Fair. Liest und schreibt live in Airtab
 ## Funktionen
 
 - 316 Stände in 10 Karrees + Außenreihen, exakt nach Plan-PDF
+- Umschaltbar auf den kleinen Plan (297 Stände, 9 Karrees) per Dropdown oben rechts — jeder Plan hat seine eigene Airtable-Tabelle
 - Klick auf Stand → Detail (Status, Aussteller, Bezahlt, Notizen)
 - **Status wird automatisch vorgeschlagen**, manueller Override per Dropdown:
   - kein Aussteller → **frei** (grün)
@@ -25,7 +26,9 @@ Saalplan-2026/
 ├── index.html
 ├── src/
 │   ├── app.js          ← Haupt-Logik
-│   ├── layout.js       ← Position der 316 Stände
+│   ├── plans.js        ← Plan-Konfiguration (Tabelle, Field-IDs, Layout)
+│   ├── layout.js       ← Position der 316 Stände (großer Plan)
+│   ├── layout-klein.js ← Position der 297 Stände (kleiner Plan)
 │   ├── airtable.js     ← API-Client
 │   └── style.css
 └── README.md
@@ -114,8 +117,9 @@ Dann im Browser: http://localhost:8000
 
 Der Code ist klein und überschaubar. Wenn du etwas ändern willst:
 
-- **Layout (Positionen der Stände)** → [src/layout.js](src/layout.js)
-- **Airtable-Felder oder Tabellen-IDs** → [src/airtable.js](src/airtable.js)
+- **Layout (Positionen der Stände)** → [src/layout.js](src/layout.js) bzw. [src/layout-klein.js](src/layout-klein.js)
+- **Standplan-Tabellen + Field-IDs pro Plan** → [src/plans.js](src/plans.js)
+- **Aussteller-Tabelle** → [src/airtable.js](src/airtable.js)
 - **Aussehen** → [src/style.css](src/style.css)
 - **App-Logik** → [src/app.js](src/app.js)
 

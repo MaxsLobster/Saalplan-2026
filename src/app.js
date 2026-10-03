@@ -1,4 +1,4 @@
-import { STAND_LAYOUT, COLS, ROWS, validateLayout } from "./layout.js";
+import { PLANS, ACTIVE_PLAN, setActivePlanId } from "./plans.js";
 import {
   BASE_ID,
   STANDPLAN_TABLE,
@@ -10,6 +10,9 @@ import {
   validateToken,
 } from "./airtable.js";
 
+// Layout des aktiven Plans (layout.js oder layout-klein.js)
+const { STAND_LAYOUT, COLS, ROWS, validateLayout } = await import(ACTIVE_PLAN.layout);
+
 // === Konstanten ===
 const CELL_W = 40;
 const CELL_H = 26;
@@ -17,9 +20,22 @@ const PLAN_W = COLS * CELL_W;
 const PLAN_H = ROWS * CELL_H;
 const SYNC_INTERVAL_MS = 30_000;
 const TOKEN_KEY = "saalplan_token_v1";
-const QUEUE_KEY = "saalplan_queue_v1";
-const ERROR_LOG_KEY = "saalplan_errors_v1";
+// Queue + Error-Log pro Plan getrennt, damit nach einem Plan-Wechsel keine
+// gepufferten Updates in der falschen Tabelle landen.
+const QUEUE_KEY = `saalplan_queue_v1_${ACTIVE_PLAN.id}`;
+const ERROR_LOG_KEY = `saalplan_errors_v1_${ACTIVE_PLAN.id}`;
 const ERROR_LOG_MAX = 50;
+
+// Einmalige Migration: Queue/Log aus der Zeit vor der Plan-Umschaltung
+// gehören zur Tabelle des großen Plans.
+for (const legacyKey of ["saalplan_queue_v1", "saalplan_errors_v1"]) {
+  const legacy = localStorage.getItem(legacyKey);
+  if (legacy == null) continue;
+  if (localStorage.getItem(`${legacyKey}_gross`) == null) {
+    localStorage.setItem(`${legacyKey}_gross`, legacy);
+  }
+  localStorage.removeItem(legacyKey);
+}
 
 // === App-State ===
 const state = {
@@ -253,9 +269,10 @@ function renderPlan() {
   frame.setAttribute("class", "plan-frame");
   svg.appendChild(frame);
 
-  // EXIT / ENTRANCE Beschriftung — wie im PDF unten am Rand
+  // EXIT / ENTRANCE Beschriftung — wie im PDF unten am Rand,
+  // relativ zur Planbreite (passt für beide Pläne)
   const exitText = document.createElementNS(NS, "text");
-  exitText.setAttribute("x", 8 * CELL_W);
+  exitText.setAttribute("x", Math.round(COLS * 0.4 * CELL_W));
   exitText.setAttribute("y", (ROWS - 0.3) * CELL_H);
   exitText.setAttribute("text-anchor", "middle");
   exitText.setAttribute("class", "plan-label");
@@ -263,7 +280,7 @@ function renderPlan() {
   svg.appendChild(exitText);
 
   const entranceText = document.createElementNS(NS, "text");
-  entranceText.setAttribute("x", 17 * CELL_W);
+  entranceText.setAttribute("x", Math.round(COLS * 0.85 * CELL_W));
   entranceText.setAttribute("y", (ROWS - 0.3) * CELL_H);
   entranceText.setAttribute("text-anchor", "middle");
   entranceText.setAttribute("class", "plan-label");
@@ -884,6 +901,26 @@ async function startApp() {
       clearToken();
       location.reload();
     }
+  });
+  // Plan-Umschaltung — Tabelle + Layout stehen beim Laden fest, daher Reload
+  const planSelect = $("plan-select");
+  for (const plan of Object.values(PLANS)) {
+    planSelect.add(new Option(plan.label, plan.id));
+  }
+  planSelect.value = ACTIVE_PLAN.id;
+  planSelect.addEventListener("change", () => {
+    const next = PLANS[planSelect.value];
+    let msg = `Zu „${next.label}" wechseln? Die App lädt neu.`;
+    const pending = loadQueue().length;
+    if (pending > 0) {
+      msg += `\n\n${pending} ausstehende Updates für „${ACTIVE_PLAN.label}" bleiben gespeichert und werden gesendet, sobald du zurückwechselst.`;
+    }
+    if (!confirm(msg)) {
+      planSelect.value = ACTIVE_PLAN.id;
+      return;
+    }
+    setActivePlanId(next.id);
+    location.reload();
   });
   // Klick auf Sync-Status → Fehler-Diagnose-Modal (immer)
   $("sync-status").addEventListener("click", showErrorDialog);
